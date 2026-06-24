@@ -55,7 +55,9 @@ const copyBundle = (source, target) => {
 const sevenZip = first([
   '/usr/local/bin/7zz',
   '/opt/homebrew/bin/7zz',
+  '/usr/bin/7zz',
   '/usr/bin/7z',
+  'C:\\Program Files\\7-Zip\\7zz.exe',
   'C:\\Program Files\\7-Zip\\7z.exe',
 ])
 
