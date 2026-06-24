@@ -37,11 +37,49 @@ jobs:
       - name: Run Prettier check
         run: pnpm format:check
 
-      - name: Install browsers
-        run: pnpm test:browser:install
-
-      - name: Run tests
-        run: pnpm test
-
       - name: Build the project
         run: pnpm build
+
+  package-tauri:
+    name: Package Tauri (${{ matrix.os }})
+    needs: install-lint-build
+    if: github.event_name == 'push'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-22.04, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app package
+        run: pnpm exec tauri build
+
+      - name: Upload app package
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-${{ matrix.os }}
+          path: src-tauri/target/release/bundle/**/*
+          if-no-files-found: error

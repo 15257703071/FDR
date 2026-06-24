@@ -77,9 +77,7 @@ export function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className='text-2xl font-bold'>¥45,231.89</div>
-                  <p className='text-xs text-muted-foreground'>
-                    较上月 +20.1%
-                  </p>
+                  <p className='text-xs text-muted-foreground'>较上月 +20.1%</p>
                 </CardContent>
               </Card>
               <Card>
@@ -128,9 +126,7 @@ export function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className='text-2xl font-bold'>+12,234</div>
-                  <p className='text-xs text-muted-foreground'>
-                    较上月 +19%
-                  </p>
+                  <p className='text-xs text-muted-foreground'>较上月 +19%</p>
                 </CardContent>
               </Card>
               <Card>

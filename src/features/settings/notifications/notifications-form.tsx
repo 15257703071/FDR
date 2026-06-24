@@ -19,9 +19,7 @@ import { Switch } from '@/components/ui/switch'
 const notificationsFormSchema = z.object({
   type: z.enum(['all', 'mentions', 'none'], {
     error: (iss) =>
-      iss.input === undefined
-        ? '请选择通知提醒类型。'
-        : undefined,
+      iss.input === undefined ? '请选择通知提醒类型。' : undefined,
   }),
   mobile: z.boolean().default(false).optional(),
   communication_emails: z.boolean().default(false).optional(),
@@ -84,7 +82,9 @@ export function NotificationsForm() {
                     <FormControl>
                       <RadioGroupItem value='none' />
                     </FormControl>
-                    <FormLabel className='font-normal'>不接收任何通知</FormLabel>
+                    <FormLabel className='font-normal'>
+                      不接收任何通知
+                    </FormLabel>
                   </FormItem>
                 </RadioGroup>
               </FormControl>
@@ -101,9 +101,7 @@ export function NotificationsForm() {
               render={({ field }) => (
                 <FormItem className='flex flex-row items-center justify-between rounded-lg border p-4'>
                   <div className='space-y-0.5'>
-                    <FormLabel className='text-base'>
-                      沟通服务邮件
-                    </FormLabel>
+                    <FormLabel className='text-base'>沟通服务邮件</FormLabel>
                     <FormDescription>
                       接收有关您的系统账户活动和消息通知。
                     </FormDescription>
@@ -123,9 +121,7 @@ export function NotificationsForm() {
               render={({ field }) => (
                 <FormItem className='flex flex-row items-center justify-between rounded-lg border p-4'>
                   <div className='space-y-0.5'>
-                    <FormLabel className='text-base'>
-                      产品与营销邮件
-                    </FormLabel>
+                    <FormLabel className='text-base'>产品与营销邮件</FormLabel>
                     <FormDescription>
                       接收关于新产品发布、全新功能模块以及优化消息的邮件。
                     </FormDescription>
@@ -195,9 +191,7 @@ export function NotificationsForm() {
                 />
               </FormControl>
               <div className='space-y-1 leading-none'>
-                <FormLabel>
-                  为我的移动设备使用不同的通知设置
-                </FormLabel>
+                <FormLabel>为我的移动设备使用不同的通知设置</FormLabel>
                 <FormDescription>
                   您也可以在移动设备配置页面独立管理您的移动端通知。
                 </FormDescription>

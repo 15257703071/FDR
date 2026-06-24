@@ -30,9 +30,7 @@ const profileFormSchema = z.object({
     .max(30, '用户名长度不能超过 30 个字符。'),
   email: z.email({
     error: (iss) =>
-      iss.input === undefined
-        ? '请选择要显示的公开邮箱。'
-        : undefined,
+      iss.input === undefined ? '请选择要显示的公开邮箱。' : undefined,
   }),
   bio: z.string().max(160).min(4),
   urls: z
