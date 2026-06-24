@@ -1,15 +1,18 @@
 import {
   accessSync,
+  chmodSync,
   constants,
+  copyFileSync,
   cpSync,
   mkdirSync,
   realpathSync,
   rmSync,
 } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { basename, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const root = new URL('..', import.meta.url).pathname
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const binDir = join(root, 'src-tauri', 'bin')
 const loDir = join(root, 'src-tauri', 'vendor', 'libreoffice')
 
@@ -27,19 +30,26 @@ const exists = (path) => {
 
 const first = (paths) => paths.find(exists)
 
-const copy = (source, target, options = {}) => {
-  if (exists(target) && realpathSync(source) === realpathSync(target)) return
-  cpSync(source, target, options)
+const sameFile = (source, target) =>
+  exists(source) &&
+  exists(target) &&
+  realpathSync(source) === realpathSync(target)
+
+const copyFile = (source, target, mode) => {
+  if (sameFile(source, target)) return
+  rmSync(target, { force: true, recursive: true })
+  copyFileSync(realpathSync(source), target)
+  if (mode) chmodSync(target, mode)
 }
 
 const copyBundle = (source, target) => {
-  if (exists(target) && realpathSync(source) === realpathSync(target)) return
+  if (sameFile(source, target)) return
   rmSync(target, { force: true, recursive: true })
   if (source.endsWith('.app')) {
     execFileSync('ditto', [source, target])
     return
   }
-  cpSync(source, target, { recursive: true })
+  cpSync(source, target, { recursive: true, force: true })
 }
 
 const sevenZip = first([
@@ -50,9 +60,9 @@ const sevenZip = first([
 ])
 
 if (sevenZip) {
-  copy(sevenZip, join(binDir, basename(sevenZip)))
+  copyFile(sevenZip, join(binDir, basename(sevenZip)), 0o755)
   const dll = 'C:\\Program Files\\7-Zip\\7z.dll'
-  if (exists(dll)) copy(dll, join(binDir, '7z.dll'))
+  if (exists(dll)) copyFile(dll, join(binDir, '7z.dll'))
 }
 
 const libreOffice = first([
