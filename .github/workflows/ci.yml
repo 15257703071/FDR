@@ -48,7 +48,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-22.04, windows-latest]
+        include:
+          - os: macos-latest
+            bundle: dmg
+          - os: ubuntu-22.04
+            bundle: deb
+          - os: windows-latest
+            bundle: nsis
 
     steps:
       - name: Checkout code
@@ -75,11 +81,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build app package
-        run: pnpm exec tauri build
+        run: pnpm exec tauri build --ci --no-sign --bundles ${{ matrix.bundle }}
 
       - name: Upload app package
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-${{ matrix.os }}
+          name: tauri-${{ matrix.os }}-${{ matrix.bundle }}
           path: src-tauri/target/release/bundle/**/*
           if-no-files-found: error
