@@ -7,7 +7,7 @@
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5180",
     "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build"
+    "beforeBuildCommand": "pnpm build && pnpm prepare:tauri-resources"
   },
   "app": {
     "windows": [
@@ -26,7 +26,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "resources": ["scripts/fdr_processor.py"],
+    "resources": ["bin/", "vendor/libreoffice/"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -36,6 +36,11 @@
     ],
     "android": {
       "debugApplicationIdSuffix": ".debug"
+    },
+    "linux": {
+      "deb": {
+        "depends": ["libreoffice", "p7zip-full"]
+      }
     }
   }
 }

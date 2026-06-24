@@ -7,7 +7,15 @@ import { defineConfig } from 'eslint/config'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig(
-  { ignores: ['dist', 'src-tauri/target', 'src/components/ui'] },
+  {
+    ignores: [
+      'dist',
+      'src-tauri/bin',
+      'src-tauri/target',
+      'src-tauri/vendor',
+      'src/components/ui',
+    ],
+  },
   {
     extends: [
       js.configs.recommended,
