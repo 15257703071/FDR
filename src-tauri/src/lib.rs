@@ -1,8 +1,10 @@
 use printpdf::{
-    Mm, Op, PdfDocument, PdfPage, PdfParseOptions, PdfSaveOptions, Pt, RawImage, XObjectTransform,
+    Mm, Op, PdfDocument as PrintPdfDocument, PdfPage, PdfSaveOptions, Pt, RawImage,
+    XObjectTransform,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -61,23 +63,15 @@ fn file_type(path: &Path) -> &'static str {
 }
 
 fn entry_for(path: &Path) -> Result<FileEntry, String> {
-    let mut final_path = path.to_path_buf();
-    if matches!(file_type(path), "excel" | "word") {
-        let pdf_sibling = path.with_extension("pdf");
-        if pdf_sibling.exists() {
-            final_path = pdf_sibling;
-        }
-    }
-
     Ok(FileEntry {
-        name: final_path
+        name: path
             .file_name()
             .and_then(|name| name.to_str())
             .unwrap_or_default()
             .to_string(),
-        path: final_path.to_string_lossy().to_string(),
-        file_type: file_type(&final_path).to_string(),
-        size_bytes: fs::metadata(&final_path).map_err(|e| e.to_string())?.len(),
+        path: path.to_string_lossy().to_string(),
+        file_type: file_type(path).to_string(),
+        size_bytes: fs::metadata(path).map_err(|e| e.to_string())?.len(),
     })
 }
 
@@ -314,8 +308,11 @@ fn convert_office_to_pdf(
         .and_then(|name| name.to_str())
         .ok_or_else(|| "文件名无效".to_string())?;
     let output_pdf = output_dir.join(format!("{base_name}.pdf"));
+    let _ = fs::remove_file(&output_pdf);
     let convert_to = match file_type(office_path) {
-        "excel" => r#"pdf:calc_pdf_Export:{"SinglePageSheets":{"type":"boolean","value":"true"}}"#,
+        "excel" => {
+            r#"pdf:calc_pdf_Export:{"SinglePageSheets":{"type":"boolean","value":"true"},"ExportHiddenSheets":{"type":"boolean","value":"true"}}"#
+        }
         _ => "pdf",
     };
     let output = Command::new(soffice)
@@ -341,7 +338,7 @@ fn convert_office_to_pdf(
     }
 }
 
-fn image_pdf(image_path: &Path) -> Result<PdfDocument, String> {
+fn write_image_pdf(image_path: &Path, output_path: &Path) -> Result<(), String> {
     let bytes = fs::read(image_path).map_err(|e| e.to_string())?;
     let image = RawImage::decode_from_bytes(&bytes, &mut Vec::new())?;
     let page_w_pt = 595.2756;
@@ -355,7 +352,7 @@ fn image_pdf(image_path: &Path) -> Result<PdfDocument, String> {
     let x = (page_w_pt - w) / 2.0;
     let y = (page_h_pt - h) / 2.0;
 
-    let mut doc = PdfDocument::new("image");
+    let mut doc = PrintPdfDocument::new("image");
     let image_id = doc.add_image(&image);
     doc.with_pages(vec![PdfPage::new(
         Mm(210.0),
@@ -372,12 +369,89 @@ fn image_pdf(image_path: &Path) -> Result<PdfDocument, String> {
             },
         }],
     )]);
-    Ok(doc)
+    let bytes = doc.save(&PdfSaveOptions::default(), &mut Vec::new());
+    fs::write(output_path, bytes).map_err(|e| e.to_string())
 }
 
-fn parse_pdf(path: &Path) -> Result<PdfDocument, String> {
-    let bytes = fs::read(path).map_err(|e| e.to_string())?;
-    PdfDocument::parse(&bytes, &PdfParseOptions::default(), &mut Vec::new())
+fn merge_pdf_paths(pdf_paths: &[PathBuf], output_path: &Path) -> Result<(), String> {
+    let mut max_id = 1;
+    let mut documents_pages = BTreeMap::new();
+    let mut documents_objects = BTreeMap::new();
+    let mut document = lopdf::Document::with_version("1.5");
+
+    for path in pdf_paths {
+        let mut doc = lopdf::Document::load(path).map_err(|e| e.to_string())?;
+        if doc.is_encrypted() {
+            doc.decrypt("").map_err(|e| e.to_string())?;
+        }
+        doc.renumber_objects_with(max_id);
+        max_id = doc.max_id + 1;
+
+        for object_id in doc.get_pages().into_values() {
+            let object = doc
+                .get_object(object_id)
+                .map_err(|e| e.to_string())?
+                .to_owned();
+            documents_pages.insert(object_id, object);
+        }
+        documents_objects.extend(doc.objects);
+    }
+
+    let mut catalog_object = None;
+    let mut pages_object = None;
+
+    for (object_id, object) in documents_objects {
+        match object.type_name().unwrap_or(b"") {
+            b"Catalog" => {
+                catalog_object.get_or_insert((object_id, object));
+            }
+            b"Pages" => {
+                pages_object.get_or_insert((object_id, object));
+            }
+            b"Page" | b"Outlines" | b"Outline" => {}
+            _ => {
+                document.objects.insert(object_id, object);
+            }
+        }
+    }
+
+    let (catalog_id, catalog_object) = catalog_object.ok_or("PDF Catalog root not found")?;
+    let (pages_id, pages_object) = pages_object.ok_or("PDF Pages root not found")?;
+
+    for (object_id, object) in documents_pages.iter() {
+        let mut dictionary = object.as_dict().map_err(|e| e.to_string())?.clone();
+        dictionary.set("Parent", pages_id);
+        document
+            .objects
+            .insert(*object_id, lopdf::Object::Dictionary(dictionary));
+    }
+
+    let mut pages_dictionary = pages_object.as_dict().map_err(|e| e.to_string())?.clone();
+    pages_dictionary.set("Count", documents_pages.len() as u32);
+    pages_dictionary.set(
+        "Kids",
+        documents_pages
+            .into_keys()
+            .map(lopdf::Object::Reference)
+            .collect::<Vec<_>>(),
+    );
+    document
+        .objects
+        .insert(pages_id, lopdf::Object::Dictionary(pages_dictionary));
+
+    let mut catalog_dictionary = catalog_object.as_dict().map_err(|e| e.to_string())?.clone();
+    catalog_dictionary.set("Pages", pages_id);
+    catalog_dictionary.remove(b"Outlines");
+    document
+        .objects
+        .insert(catalog_id, lopdf::Object::Dictionary(catalog_dictionary));
+    document.trailer.set("Root", catalog_id);
+    document.max_id = document.objects.len() as u32;
+    document.renumber_objects();
+    document
+        .save(output_path)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 fn merge_files(
@@ -387,46 +461,41 @@ fn merge_files(
     temp_dir: &Path,
 ) -> Result<String, String> {
     let entries: Vec<MergeEntry> = serde_json::from_str(files_json).map_err(|e| e.to_string())?;
-    let output_dir = output_path.parent().unwrap_or(temp_dir);
-    fs::create_dir_all(output_dir).map_err(|e| e.to_string())?;
-    let mut merged = PdfDocument::new("FDR merged PDF");
+    let work_dir = temp_dir.join("fdr_pdf_work");
+    fs::create_dir_all(&work_dir).map_err(|e| e.to_string())?;
     let mut processed = 0usize;
     let mut temp_pdfs = Vec::new();
+    let mut pdf_paths = Vec::new();
 
-    for entry in entries.iter() {
-        let mut path = PathBuf::from(&entry.path);
-        let mut kind = entry.file_type.as_str();
-        if matches!(kind, "excel" | "word") {
-            let sibling = path.with_extension("pdf");
-            if sibling.exists() {
-                path = sibling;
-                kind = "pdf";
-            }
-        }
+    for (idx, entry) in entries.iter().enumerate() {
+        let path = PathBuf::from(&entry.path);
+        let kind = entry.file_type.as_str();
         if !path.exists() {
             continue;
         }
 
-        let doc = match kind {
-            "pdf" => parse_pdf(&path)?,
-            "image" => image_pdf(&path)?,
-            "excel" | "word" => {
-                let pdf = convert_office_to_pdf(app, &path, output_dir)?;
-                temp_pdfs.push(pdf.clone());
-                parse_pdf(&pdf)?
+        let pdf = match kind {
+            "pdf" => path,
+            "image" => {
+                let pdf = work_dir.join(format!("_temp_img_{idx}.pdf"));
+                write_image_pdf(&path, &pdf)?;
+                pdf
             }
+            "excel" | "word" => convert_office_to_pdf(app, &path, &work_dir)?,
             _ => continue,
         };
-        merged.append_document(doc);
+        pdf_paths.push(pdf.clone());
+        if !matches!(kind, "pdf") {
+            temp_pdfs.push(pdf);
+        }
         processed += 1;
     }
 
-    if merged.pages.is_empty() {
+    if pdf_paths.is_empty() {
         return Err("没有可合并的有效文件".to_string());
     }
 
-    let bytes = merged.save(&PdfSaveOptions::default(), &mut Vec::new());
-    fs::write(output_path, bytes).map_err(|e| e.to_string())?;
+    merge_pdf_paths(&pdf_paths, output_path)?;
     for pdf in temp_pdfs {
         let _ = fs::remove_file(pdf);
     }
@@ -494,4 +563,56 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use printpdf::{BuiltinFont, PdfFontHandle, TextItem};
+
+    fn write_test_pdf(path: &Path, text: &str) {
+        let mut doc = PrintPdfDocument::new("test");
+        doc.with_pages(vec![PdfPage::new(
+            Mm(210.0),
+            Mm(297.0),
+            vec![
+                Op::StartTextSection,
+                Op::SetTextCursor {
+                    pos: printpdf::Point::new(Mm(20.0), Mm(260.0)),
+                },
+                Op::SetFont {
+                    font: PdfFontHandle::Builtin(BuiltinFont::Helvetica),
+                    size: Pt(16.0),
+                },
+                Op::ShowText {
+                    items: vec![TextItem::Text(text.to_string())],
+                },
+                Op::EndTextSection,
+            ],
+        )]);
+        fs::write(path, doc.save(&PdfSaveOptions::default(), &mut Vec::new())).unwrap();
+    }
+
+    #[test]
+    fn merge_pdf_paths_keeps_all_pages() {
+        let dir = std::env::temp_dir().join(format!(
+            "fdr_merge_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let first = dir.join("first.pdf");
+        let second = dir.join("second.pdf");
+        let merged = dir.join("merged.pdf");
+        write_test_pdf(&first, "first");
+        write_test_pdf(&second, "second");
+
+        merge_pdf_paths(&[first, second], &merged).unwrap();
+
+        let pages = lopdf::Document::load(&merged).unwrap().get_pages().len();
+        let _ = fs::remove_dir_all(dir);
+        assert_eq!(pages, 2);
+    }
 }
