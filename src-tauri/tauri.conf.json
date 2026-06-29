@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "shadcn-admin-tauri",
-  "version": "0.1.0",
+  "version": "2.2.1",
   "identifier": "com.shadcn.admin.tauri",
   "build": {
     "frontendDist": "../dist",
@@ -26,7 +26,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "resources": ["bin/", "vendor/libreoffice/"],
+    "resources": [
+      "bin/",
+      "vendor/libreoffice/"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -39,8 +42,19 @@
     },
     "linux": {
       "deb": {
-        "depends": ["libreoffice", "p7zip-full"]
+        "depends": [
+          "libreoffice",
+          "p7zip-full"
+        ]
       }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY0NjE3RTU1M0VBQ0ExClJXU2hyRDVWZm1IMEFNZU80MzRYd0lVTEdkU1k2SStCQmMydUJLcXYzQUREeXVMWlhZK3NyZk1CCg==",
+      "endpoints": [
+        "https://github.com/15257703071/FDR/releases/latest/download/latest.json"
+      ]
     }
   }
 }

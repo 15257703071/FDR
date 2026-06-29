@@ -1,0 +1,90 @@
+name: Release Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release-tauri:
+    name: Release Tauri (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            bundle: dmg
+          - os: ubuntu-22.04
+            bundle: deb
+          - os: windows-latest
+            bundle: nsis
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev libreoffice p7zip-full librsvg2-dev patchelf
+
+      - name: Install macOS bundled helpers
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install --cask libreoffice
+          brew install sevenzip
+          mkdir -p src-tauri/vendor/libreoffice src-tauri/bin
+          cp -R /Applications/LibreOffice.app src-tauri/vendor/libreoffice/
+          cp "$(command -v 7zz)" src-tauri/bin/7zz
+
+      - name: Install Windows bundled helpers
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          choco install libreoffice-fresh 7zip -y --no-progress
+          New-Item -ItemType Directory -Force src-tauri/vendor/libreoffice, src-tauri/bin
+          Copy-Item "C:\Program Files\LibreOffice" "src-tauri\vendor\libreoffice\LibreOffice" -Recurse -Force
+          Copy-Item "C:\Program Files\7-Zip\7z.exe" "src-tauri\bin\7z.exe" -Force
+          Copy-Item "C:\Program Files\7-Zip\7z.dll" "src-tauri\bin\7z.dll" -Force
+
+      - name: Install Linux bundled helpers
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          mkdir -p src-tauri/bin
+          cp "$(command -v 7z)" src-tauri/bin/7z
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync version from tag
+        run: pnpm version:sync ${{ github.ref_name }}
+
+      - name: Build and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: FDR ${{ github.ref_name }}
+          releaseBody: 自动构建的桌面安装包。
+          releaseDraft: false
+          prerelease: false
+          args: --ci --bundles ${{ matrix.bundle }}

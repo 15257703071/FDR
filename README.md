@@ -60,7 +60,7 @@
 
 ## 📦 应用打包发布
 
-当开发完毕需要分发给其他用户时，可直接打包生成 macOS 平台标准的安装包：
+当开发完毕需要分发给其他用户时，可直接打包生成安装包：
 
 1. **执行 Tauri 一键打包**：
 
@@ -72,3 +72,30 @@
    打包完成后，可在项目根目录下的以下路径找到分发的磁盘映像文件（.dmg）或应用程序（.app）：
    - **DMG 安装包**：`src-tauri/target/release/bundle/dmg/`
    - **APP 应用程序**：`src-tauri/target/release/bundle/macos/`
+
+### GitHub Actions 自动发布与更新
+
+桌面端自动更新使用 Tauri updater。当前公钥已写入 `src-tauri/tauri.conf.json`，首次发布前，需要把对应签名私钥写入仓库 Secret：
+
+```bash
+cat .secrets/fdr-tauri-updater.key
+```
+
+将命令输出的私钥内容配置到 GitHub Secrets：
+
+- `TAURI_SIGNING_PRIVATE_KEY`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`：当前无密码 key 可留空
+
+如果重新生成 signing key，需要同步替换 `src-tauri/tauri.conf.json` 里的 `plugins.updater.pubkey`。
+
+发布新版本时只需要推送 tag，workflow 会按 tag 同步版本号、打包、创建 GitHub Release，并生成自动更新所需的 `latest.json`：
+
+```bash
+pnpm release 2.3.0
+```
+
+只想本地提交和打 tag、不推送时：
+
+```bash
+pnpm release 2.3.0 --no-push
+```

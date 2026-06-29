@@ -548,11 +548,15 @@ fn generate_merged_pdf(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             unzip_and_scan,
             generate_merged_pdf
         ])
         .setup(|app| {
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
             app.handle().plugin(tauri_plugin_dialog::init())?;
             if cfg!(debug_assertions) {
                 app.handle().plugin(
