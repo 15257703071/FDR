@@ -17,9 +17,9 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            bundle: dmg
+            args: --ci --bundles app,dmg
           - os: windows-latest
-            bundle: nsis
+            args: --ci --bundles nsis
 
     steps:
       - name: Checkout code
@@ -68,7 +68,7 @@ jobs:
         run: echo "TAURI_SIGNING_PRIVATE_KEY=${TAURI_SIGNING_PRIVATE_KEY_RAW%\%}" >> "$GITHUB_ENV"
 
       - name: Build and publish release
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -78,4 +78,6 @@ jobs:
           releaseBody: 自动构建的桌面安装包。
           releaseDraft: false
           prerelease: false
-          args: --ci --bundles ${{ matrix.bundle }}
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          args: ${{ matrix.args }}
