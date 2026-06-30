@@ -27,6 +27,12 @@ interface HeaderItem {
   name: string
 }
 
+type ExcelHeadersResponse = {
+  status: 'success' | 'error'
+  headers: HeaderItem[]
+  message?: string
+}
+
 interface MatchResult {
   row: number
   name: string
@@ -42,6 +48,28 @@ interface MatchResult {
   reg_check_ok: boolean
   ocr_check_ok: boolean
   texts_debug: string
+}
+
+type OcrProgressPayload = {
+  type?: 'status' | 'progress' | 'done'
+  status?: 'error' | 'success' | MatchResult['status']
+  message?: string
+  current?: number
+  total?: number
+  output_path?: string
+  row?: number
+  name?: string
+  reg_vin?: string
+  ocr_vin?: string
+  all_vins?: string
+  reg_duplicate?: boolean
+  ocr_duplicate?: boolean
+  matched?: boolean
+  reg_len_ok?: boolean
+  ocr_len_ok?: boolean
+  reg_check_ok?: boolean
+  ocr_check_ok?: boolean
+  texts_debug?: string
 }
 
 export function OcrMatch() {
@@ -110,7 +138,7 @@ export function OcrMatch() {
       // Tauri 推荐使用 plugin-dialog 的 open API 来读取文件的绝对路径最为稳妥。
       // 为方便用户，支持拖拽文件获取其绝对路径：
       // 在 Tauri App 里，拖拽获取到的 file 对象其实是带 path 属性的
-      const rawFile = file as any
+      const rawFile = file as File & { path?: string }
       if (rawFile.path) {
         loadExcel(rawFile.path, file.name)
       } else {
@@ -175,16 +203,16 @@ export function OcrMatch() {
       const resultJson = await invoke<string>('get_excel_headers', { 
         filePath: path,
       })
-      const result = JSON.parse(resultJson)
+      const result = JSON.parse(resultJson) as ExcelHeadersResponse
       if (result.status === 'success') {
         setHeaders(result.headers)
         // 智能猜测常用列
         const vinHeader =
-          result.headers.find((h: any) => h.name.includes('车架') || h.name.includes('VIN')) ||
-          result.headers.find((h: any) => h.col === 'D')
+          result.headers.find((h) => h.name.includes('车架') || h.name.includes('VIN')) ||
+          result.headers.find((h) => h.col === 'D')
         const imgHeader =
-          result.headers.find((h: any) => h.col === 'AA') ||
-          result.headers.find((h: any) => h.name.includes('合格证') || h.name.includes('图片'))
+          result.headers.find((h) => h.col === 'AA') ||
+          result.headers.find((h) => h.name.includes('合格证') || h.name.includes('图片'))
         if (vinHeader) setVinCol(vinHeader.col)
         if (imgHeader) setImgCol(imgHeader.col)
         toast.success('Excel 列头解析成功')
@@ -254,46 +282,57 @@ export function OcrMatch() {
       unlistenProgress = await listen<string>('ocr-progress', (event) => {
         try {
           sawBackendProgress = true
-          const data = JSON.parse(event.payload)
+          const data = JSON.parse(event.payload) as OcrProgressPayload
           if (data.status === 'error') {
             finishWithError(data.message || 'OCR 匹配失败')
           } else if (data.type === 'status') {
-            setStatusText(data.message)
+            setStatusText(data.message ?? '')
             if (typeof data.total === 'number') {
+              const total = data.total
               setProgress((prev) => ({
                 current: typeof data.current === 'number' ? data.current : prev.current,
-                total: data.total,
+                total,
               }))
             }
           } else if (data.type === 'progress') {
-            setProgress({ current: data.current, total: data.total })
+            if (
+              typeof data.current !== 'number' ||
+              typeof data.total !== 'number' ||
+              typeof data.row !== 'number'
+            ) {
+              return
+            }
+            const current = data.current
+            const total = data.total
+            const row = data.row
+            setProgress({ current, total })
             
             setMatchResults((prev) => {
-              const filtered = prev.filter((r) => r.row !== data.row)
+              const filtered = prev.filter((r) => r.row !== row)
               return [...filtered, {
-                row: data.row,
-                name: data.name,
-                reg_vin: data.reg_vin,
-                ocr_vin: data.ocr_vin,
-                all_vins: data.all_vins,
-                status: data.status,
-                reg_duplicate: data.reg_duplicate,
-                ocr_duplicate: data.ocr_duplicate,
-                matched: data.matched,
-                reg_len_ok: data.reg_len_ok,
-                ocr_len_ok: data.ocr_len_ok,
-                reg_check_ok: data.reg_check_ok,
-                ocr_check_ok: data.ocr_check_ok,
-                texts_debug: data.texts_debug
+                row,
+                name: data.name ?? '',
+                reg_vin: data.reg_vin ?? '',
+                ocr_vin: data.ocr_vin ?? '',
+                all_vins: data.all_vins ?? '',
+                status: (data.status as MatchResult['status']) ?? '匹配失败',
+                reg_duplicate: Boolean(data.reg_duplicate),
+                ocr_duplicate: Boolean(data.ocr_duplicate),
+                matched: Boolean(data.matched),
+                reg_len_ok: Boolean(data.reg_len_ok),
+                ocr_len_ok: Boolean(data.ocr_len_ok),
+                reg_check_ok: Boolean(data.reg_check_ok),
+                ocr_check_ok: Boolean(data.ocr_check_ok),
+                texts_debug: data.texts_debug ?? '',
               }].sort((a, b) => a.row - b.row)
             })
           } else if (data.type === 'done') {
-            if (data.status === 'success') {
+            if (data.status === 'success' && data.output_path) {
               finishWithSuccess(data.output_path)
             }
           }
-        } catch (err) {
-          console.error('Error parsing progress json:', err)
+        } catch {
+          // Ignore malformed progress events from older builds.
         }
       })
 
@@ -301,7 +340,6 @@ export function OcrMatch() {
 
       await invoke(command, args)
     } catch (e) {
-      console.error("OCR match process catch exception:", e)
       const msg = String(e)
       finishWithError(`OCR 运行失败: ${msg}`)
     }
@@ -332,7 +370,7 @@ export function OcrMatch() {
     try {
       const { invoke } = await import('@tauri-apps/api/core')
       await invoke('show_in_folder', { path: outputPath })
-    } catch (e) {
+    } catch {
       toast.error('无法打开文件路径')
     }
   }
