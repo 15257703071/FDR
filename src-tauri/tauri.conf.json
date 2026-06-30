@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "shadcn-admin-tauri",
-  "version": "2.2.2",
+  "productName": "金融部小工具",
+  "version": "2.2.3",
   "identifier": "com.shadcn.admin.tauri",
   "build": {
     "frontendDist": "../dist",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "shadcn-admin-tauri",
+        "title": "金融部小工具",
         "width": 800,
         "height": 600,
         "resizable": true,
@@ -25,9 +25,11 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "resources": [
       "bin/",
+      "ocr-models/",
       "vendor/libreoffice/"
     ],
     "icon": [

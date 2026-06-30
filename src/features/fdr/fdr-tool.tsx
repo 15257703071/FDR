@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   FolderArchive,
   FileText,
@@ -155,6 +155,52 @@ export default function FdrTool() {
     useState<string>('中交租赁_福清城投贸易用印统一资料')
   const [statusText, setStatusText] = useState<string>('')
 
+  // 待合并打包队列的拖动滚动逻辑
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [isDown, setIsDown] = useState(false)
+  const [startY, setStartY] = useState(0)
+  const [scrollTop, setScrollTop] = useState(0)
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('input') || target.closest('select')) {
+      return
+    }
+    setIsDown(true)
+    e.preventDefault() // 阻止默认的选择文本或拖动元素行为，使事件可以流向 mousemove
+    if (scrollRef.current) {
+      scrollRef.current.style.cursor = 'grabbing'
+      scrollRef.current.style.userSelect = 'none'
+    }
+    setStartY(e.clientY)
+    setScrollTop(scrollRef.current?.scrollTop || 0)
+  }
+
+  const handleMouseLeave = () => {
+    setIsDown(false)
+    if (scrollRef.current) {
+      scrollRef.current.style.cursor = 'grab'
+      scrollRef.current.style.removeProperty('user-select')
+    }
+  }
+
+  const handleMouseUp = () => {
+    setIsDown(false)
+    if (scrollRef.current) {
+      scrollRef.current.style.cursor = 'grab'
+      scrollRef.current.style.removeProperty('user-select')
+    }
+  }
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDown) return
+    e.preventDefault()
+    const dy = e.clientY - startY
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollTop - dy * 1.5
+    }
+  }
+
   const handleSelectFile = async () => {
     try {
       const { open } = await import('@tauri-apps/plugin-dialog')
@@ -299,20 +345,21 @@ export default function FdrTool() {
     }
   }
 
-  // Select / Deselect All
   const handleSelectAll = (select: boolean) => {
     if (!scanData) return
+    const allFiles: FileEntry[] = []
+    scanData.vehicle_folders.forEach((v) => {
+      v.files.forEach((f) => allFiles.push(f))
+    })
+    scanData.other_files.forEach((f) => allFiles.push(f))
+
+    // 智能反选：如果点击全选，但当前队列已满，则视为要反选（即取消全选）
+    const shouldSelect = select && mergeQueue.length !== allFiles.length
     const nextSelected: Record<string, boolean> = {}
     const queue: FileEntry[] = []
 
-    if (select) {
-      scanData.vehicle_folders.forEach((v) => {
-        v.files.forEach((f) => {
-          nextSelected[f.path] = true
-          queue.push(f)
-        })
-      })
-      scanData.other_files.forEach((f) => {
+    if (shouldSelect) {
+      allFiles.forEach((f) => {
         nextSelected[f.path] = true
         queue.push(f)
       })
@@ -681,7 +728,15 @@ export default function FdrTool() {
                   <p className='text-sm'>请在左侧勾选文件以加入合并队列</p>
                 </div>
               ) : (
-                <div className='mb-4 flex-1 space-y-1.5 overflow-y-auto pr-1'>
+                <div
+                  ref={scrollRef}
+                  onMouseDown={handleMouseDown}
+                  onMouseLeave={handleMouseLeave}
+                  onMouseUp={handleMouseUp}
+                  onMouseMove={handleMouseMove}
+                  className='mb-4 flex-1 space-y-1.5 overflow-y-auto pr-1 select-none'
+                  style={{ cursor: 'grab' }}
+                >
                   {mergeQueue.map((item, idx) => (
                     <div
                       key={item.path}

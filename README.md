@@ -94,6 +94,10 @@ cat .secrets/fdr-tauri-updater.key
 pnpm release 2.3.0
 ```
 
+发布完成后，GitHub Release 资产中应包含 `latest.json`、安装包及对应 `.sig` 签名文件；桌面端检测到新版本后会自动下载、安装并重启应用。
+
+注意：更新地址必须能被桌面客户端匿名访问。私有 GitHub 仓库的 Release 会返回 404，不能直接作为 `plugins.updater.endpoints`；请改用公开 Release、公开更新仓库或对象存储托管 `latest.json` 和更新包。
+
 只想本地提交和打 tag、不推送时：
 
 ```bash

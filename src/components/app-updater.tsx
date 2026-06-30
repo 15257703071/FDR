@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Download, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { installAvailableUpdate } from '@/lib/updater'
+import { installAvailableUpdate, updateErrorMessage } from '@/lib/updater'
 import { Button } from '@/components/ui/button'
 
 function progressText(downloaded: number, total?: number) {
@@ -18,7 +18,7 @@ export function AutoUpdater() {
       toastId = toast.loading(progressText(downloaded, total), { id: toastId })
     }).catch((error) => {
       if (toastId) {
-        toast.error(`自动更新失败：${String(error)}`, { id: toastId })
+        toast.error(`自动更新失败：${updateErrorMessage(error)}`, { id: toastId })
       }
     })
   }, [])
@@ -48,7 +48,7 @@ export function UpdatePanel() {
         })
       }
     } catch (error) {
-      toast.error(`更新失败：${String(error)}`, { id: toastId })
+      toast.error(`更新失败：${updateErrorMessage(error)}`, { id: toastId })
     } finally {
       setIsChecking(false)
     }

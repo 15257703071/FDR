@@ -14,6 +14,14 @@ export function canUseUpdater() {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 }
 
+export function updateErrorMessage(error: unknown) {
+  const message = String(error)
+  if (message.includes('valid release JSON')) {
+    return '更新源不可访问：请确认 latest.json 已发布，且更新地址可公开访问'
+  }
+  return message
+}
+
 export async function installAvailableUpdate(
   onProgress?: (progress: UpdateProgress) => void
 ): Promise<UpdateResult> {

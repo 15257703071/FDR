@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "2.2.2"
+version = "2.2.3"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -29,3 +29,6 @@ tauri-plugin-updater = "2"
 printpdf = { version = "0.9.1", default-features = false, features = ["jpeg", "png"] }
 zip = { version = "4.2.0", default-features = false, features = ["deflate"] }
 lopdf = "0.39.0"
+ocr-rs = "2.3.1"
+image = "0.25"
+regex = "1"

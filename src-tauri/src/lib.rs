@@ -12,6 +12,8 @@ use std::process::Command;
 use tauri::Manager;
 use zip::ZipArchive;
 
+mod ocr_match;
+
 #[derive(Serialize, Clone)]
 struct FileEntry {
     name: String,
@@ -545,13 +547,78 @@ fn generate_merged_pdf(
     )
 }
 
+#[tauri::command]
+fn show_in_folder(path: String) -> Result<(), String> {
+    let path = Path::new(&path);
+    if !path.exists() {
+        return Err("文件不存在".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .args(&["/select,", path.to_str().unwrap()])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .args(&["-R", path.to_str().unwrap()])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(parent) = path.parent() {
+            Command::new("xdg-open")
+                .arg(parent.to_str().unwrap())
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn get_excel_headers(file_path: String) -> Result<String, String> {
+    ocr_match::headers(&file_path)
+}
+
+#[tauri::command]
+fn start_ocr_match(
+    window: tauri::Window,
+    app_handle: tauri::AppHandle,
+    file_path: String,
+    vin_col: String,
+    img_col: String,
+) -> Result<String, String> {
+    ocr_match::run_match(window, app_handle, file_path, vin_col, img_col)
+}
+
+#[tauri::command]
+fn start_folder_ocr_match(
+    window: tauri::Window,
+    app_handle: tauri::AppHandle,
+    root_dir: String,
+) -> Result<String, String> {
+    ocr_match::run_folder_match(window, app_handle, root_dir)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             unzip_and_scan,
-            generate_merged_pdf
+            generate_merged_pdf,
+            get_excel_headers,
+            start_ocr_match,
+            start_folder_ocr_match,
+            show_in_folder
         ])
         .setup(|app| {
             #[cfg(desktop)]
