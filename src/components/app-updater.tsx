@@ -18,7 +18,9 @@ export function AutoUpdater() {
       toastId = toast.loading(progressText(downloaded, total), { id: toastId })
     }).catch((error) => {
       if (toastId) {
-        toast.error(`自动更新失败：${updateErrorMessage(error)}`, { id: toastId })
+        toast.error(`自动更新失败：${updateErrorMessage(error)}`, {
+          id: toastId,
+        })
       }
     })
   }, [])

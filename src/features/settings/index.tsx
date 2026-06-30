@@ -3,16 +3,17 @@ import { Download, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { installAvailableUpdate, updateErrorMessage } from '@/lib/updater'
 import { Button } from '@/components/ui/button'
+import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ThemeSwitch } from '@/components/theme-switch'
-import { ConfigDrawer } from '@/components/config-drawer'
 
 declare const __APP_VERSION__: string
 
 export function Settings() {
   const [isChecking, setIsChecking] = useState(false)
-  const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.1.1'
+  const appVersion =
+    typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.1.1'
 
   async function handleUpdate() {
     setIsChecking(true)
@@ -58,7 +59,9 @@ export function Settings() {
             <div className='divide-y divide-border'>
               <div className='flex items-center justify-between p-6'>
                 <span className='text-sm font-medium'>版本</span>
-                <span className='text-sm text-muted-foreground'>{appVersion}</span>
+                <span className='text-sm text-muted-foreground'>
+                  {appVersion}
+                </span>
               </div>
               <div className='flex items-center justify-between p-6'>
                 <span className='text-sm font-medium'>检查更新</span>
@@ -67,7 +70,7 @@ export function Settings() {
                   disabled={isChecking}
                   variant='outline'
                   size='sm'
-                  className='flex items-center gap-2 border rounded-md border-input bg-background hover:bg-accent hover:text-accent-foreground'
+                  className='flex items-center gap-2 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground'
                 >
                   {isChecking ? (
                     <RefreshCw className='size-4 animate-spin' />

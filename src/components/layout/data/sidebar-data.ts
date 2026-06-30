@@ -1,9 +1,4 @@
-import {
-  Settings,
-  Command,
-  FileArchive,
-  FileText,
-} from 'lucide-react'
+import { Settings, Command, FileArchive, FileText } from 'lucide-react'
 import { type SidebarData } from '../types'
 
 export const sidebarData: SidebarData = {

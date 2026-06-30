@@ -163,7 +163,11 @@ export default function FdrTool() {
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement
-    if (target.closest('button') || target.closest('input') || target.closest('select')) {
+    if (
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('select')
+    ) {
       return
     }
     setIsDown(true)
