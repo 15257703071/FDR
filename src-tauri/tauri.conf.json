@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "金融部小工具",
-  "version": "2.2.4",
+  "version": "2.2.5",
   "identifier": "com.shadcn.admin.tauri",
   "build": {
     "frontendDist": "../dist",
